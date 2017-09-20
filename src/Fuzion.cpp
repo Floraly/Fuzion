@@ -5,10 +5,13 @@
 
 static EventListener* eventListener = nullptr;
 // The below line is defined by the build script. Keep this on line 8.
-char buildID[] = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; // Line defined by the build script.
+char buildID[] = "vjNEFLyq80ZCLlEBvqYWbsGPIeysy864"; // Line defined by the build script.
 // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-bool preload = false;
-bool isShuttingDown = false;
+
+static bool preload = false;
+static bool isShuttingDown = false;
+void *Fuzion::prev = NULL,*Fuzion::curr = NULL,*Fuzion::next = NULL;
+char Fuzion::buildPath[PATH_MAX] = {0};
 
 void MainThread()
 {
@@ -168,7 +171,7 @@ void MainThread()
 
 	eventListener = new EventListener({ "cs_game_disconnected", "player_connect_full", "player_death", "player_hurt", "switch_team" });
 
-	if (ModSupport::current_mod != ModType::CSCO && Hooker::HookRecvProp("CBaseViewModel", "m_nSequence", SkinChanger::sequenceHook))
+	if (ModSupport::current_mod != ModType::CSCO && Hooker::HookRecvProp(XORSTR("CBaseViewModel"), XORSTR("m_nSequence"), SkinChanger::sequenceHook))
 		SkinChanger::sequenceHook->SetProxyFunction((RecvVarProxyFn) SkinChanger::SetViewModelSequence);
 
 	//NetVarManager::DumpNetvars();
@@ -182,6 +185,12 @@ void MainThread()
 
 	AntiAim::LuaInit();
 
+
+    snprintf(Fuzion::buildPath, PATH_MAX, "/%s", buildID);
+    Util::RemoveLinkMapEntry(Fuzion::buildPath, &Fuzion::prev, &Fuzion::curr, &Fuzion::next); // This Breaks uload. Need to restore linked list first.
+    if( Util::SearchLinkMap(Fuzion::buildPath) ) {
+        cvar->ConsoleColorPrintf(ColorRGBA(200, 0, 0), XORSTR( "Warning! .so file did not get removed in link_map\n" ) );
+    }
 	if( preload )
 	{
 		while( !isShuttingDown )
@@ -194,6 +203,22 @@ void MainThread()
 			}
 		}
 	}
+
+    /*
+    while( !isShuttingDown )
+    {
+        static bool bFirst = true;
+        if( inputSystem->IsButtonDown(ButtonCode_t::KEY_P) && bFirst )
+        {
+            Util::RestoreLinkMapEntry(prev, curr, next);
+            if( Util::SearchLinkMap(buildPath) )
+            {
+                cvar->ConsoleColorPrintf(ColorRGBA(0, 200, 0), XORSTR( "Found buildpath again.\n" ) );
+            }
+            bFirst = false;
+        }
+    }
+    */
 }
 /* Entrypoint to the Library. Called when loading */
 int __attribute__((constructor)) Startup()
@@ -233,13 +258,10 @@ void __attribute__((destructor)) Shutdown()
 
 	SDL2::UnhookWindow();
 	SDL2::UnhookPollEvent();
-	if( !preload )
-	{
-		ImGui::Shutdown();
-	}
 
 	Preload::Cleanup();
 	AntiAim::LuaCleanup();
+
 	Aimbot::XDOCleanup();
 	NoSmoke::Cleanup();
 	TracerEffect::RestoreTracers();
@@ -274,16 +296,12 @@ void __attribute__((destructor)) Shutdown()
 }
 void Fuzion::SelfShutdown()
 {
-	// Beta Feature.
+    Util::RestoreLinkMapEntry(prev, curr, next);
+    // Beta Feature.
 	// Does not Correctly/Fully Unload yet.
-	/*
-	void *self = dlopen(NULL, RTLD_NOW | RTLD_NOLOAD);
-	if (self == NULL) {
-		cvar->ConsoleDPrintf("Error Unloading: %s\nself Addr: %p\n", dlerror(), self);
-		return;
-	}
-	*/
+    
 	Shutdown();
+    //void *self = dlopen()
 	/*
 	dlclose(self);
 	dlclose(self);
