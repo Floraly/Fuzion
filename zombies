@@ -1,5 +1,8 @@
 #!/bin/bash
 
+sudo killall -9 steamwebservice.so
+sudo killall -9 steam
+sudo killall -9 steam.sh
 sudo killall -9 csgo_linux64
 sudo killall -9 csgo.sh
 sudo killall -9 gdb
